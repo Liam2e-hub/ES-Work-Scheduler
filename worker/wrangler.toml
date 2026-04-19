@@ -1,0 +1,8 @@
+name = "es-work-scheduler-worker"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "esworkscheduler"
+database_id = "7fc6bcb5-6805-4f4c-a3f3-c38c114e62c8"
