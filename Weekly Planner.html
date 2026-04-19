@@ -1,0 +1,1108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1440" />
+<title>Weekly Slot Planner — Expressway</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f3ef;
+    --surface: #fbfaf7;
+    --surface-2: #efece6;
+    --line: #e3ded4;
+    --line-2: #d3ccbe;
+    --ink: #1b1a17;
+    --ink-2: #4a4741;
+    --ink-3: #86817a;
+    --ink-4: #b6b0a5;
+    --accent: #2f6f5f;
+    --danger: #a5442d;
+    --radius: 10px;
+
+    /* Category palette — muted, distinct hues, consistent chroma */
+    --c-admin:    #8a7a5c;
+    --c-ppm:      #2f6f5f;
+    --c-tool:     #3a6a9b;
+    --c-process:  #6a5a8a;
+    --c-proposal: #b07a2c;
+    --c-outreach: #9a5a6f;
+    --c-meeting:  #b24a3a;
+    --c-content:  #5a8a4a;
+    --c-client:   #3a3a3a;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: "ss02"; }
+  .serif { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 500; }
+
+  .app {
+    display: grid;
+    grid-template-columns: 280px 1fr 320px;
+    min-height: 100vh;
+  }
+
+  /* ---------- LEFT SIDEBAR: Categories ---------- */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    padding: 22px 20px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .brand-mark {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+    transform: translateY(1px);
+  }
+  .brand-title {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    font-size: 15px;
+  }
+  .brand-sub {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-bottom: 22px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .section-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 18px 0 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .section-label .hint { font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--ink-4); font-size: 11px; }
+
+  .cat-list { display: flex; flex-direction: column; gap: 4px; }
+  .cat {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 9px 10px;
+    border-radius: 8px;
+    cursor: grab;
+    user-select: none;
+    background: transparent;
+    border: 1px solid transparent;
+    transition: background .12s, border-color .12s;
+  }
+  .cat:hover { background: var(--surface-2); border-color: var(--line); }
+  .cat:active { cursor: grabbing; }
+  .cat.dragging { opacity: .45; }
+  .cat-dot {
+    width: 10px; height: 10px; border-radius: 3px;
+    background: var(--cat-color, var(--ink-3));
+  }
+  .cat-name { font-size: 13px; font-weight: 500; color: var(--ink); }
+  .cat-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+    background: var(--surface-2);
+    padding: 1px 6px;
+    border-radius: 4px;
+    min-width: 26px;
+    text-align: center;
+  }
+
+  .cat.erase { margin-top: 8px; border: 1px dashed var(--line-2); }
+  .cat.erase .cat-dot { background: transparent; border: 1px dashed var(--ink-4); }
+  .cat.erase .cat-name { color: var(--ink-3); }
+
+  .footer-note {
+    position: sticky;
+    bottom: -22px;
+    margin: 28px -20px -22px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+    font-size: 11px;
+    color: var(--ink-3);
+    line-height: 1.5;
+  }
+  kbd {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 10.5px;
+    color: var(--ink-2);
+  }
+
+  /* ---------- MAIN: Grid ---------- */
+  .main { padding: 24px 28px 60px; min-width: 0; }
+
+  .top-bar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 22px;
+  }
+  .week-title {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    font-size: 34px;
+    line-height: 1;
+    margin: 0 0 6px;
+  }
+  .week-meta {
+    font-size: 12.5px;
+    color: var(--ink-3);
+  }
+  .week-meta .dot { display: inline-block; width: 3px; height: 3px; background: var(--ink-4); border-radius: 50%; vertical-align: middle; margin: 0 8px; }
+
+  .progress-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 12.5px;
+  }
+  .progress-pill .bar {
+    width: 140px; height: 6px;
+    background: var(--surface-2);
+    border-radius: 99px;
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-pill .bar .fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width .3s ease;
+  }
+  .progress-pill .bar .quota {
+    position: absolute;
+    left: 64%; /* 32/50 */
+    top: -3px;
+    bottom: -3px;
+    width: 1.5px;
+    background: var(--ink-2);
+  }
+  .progress-pill .nums { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+  .progress-pill .nums strong { color: var(--ink); }
+  .progress-pill .nums .dim { color: var(--ink-3); }
+
+  .actions { display: flex; gap: 8px; margin-top: 10px; }
+  .btn {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-2);
+    padding: 6px 11px;
+    font-size: 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  .btn:hover { background: var(--surface-2); color: var(--ink); }
+  .btn.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .btn.primary:hover { background: var(--ink-2); }
+  .btn.danger:hover { color: var(--danger); border-color: #d9b4a8; }
+
+  /* grid */
+  .grid {
+    display: grid;
+    grid-template-columns: 74px repeat(5, 1fr);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .head {
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 12px 14px 11px;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .head.corner { background: var(--surface); }
+  .head.day-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    align-items: baseline;
+  }
+  .head .day-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .head .day-date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 2px;
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .head .day-total {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-3);
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    white-space: nowrap;
+  }
+  .head.corner-hint {
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 12px;
+  }
+
+  .time-col {
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+    padding: 0;
+  }
+  .time-cell {
+    height: 48px;
+    padding: 6px 10px 0 12px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    background: var(--surface);
+  }
+  .time-cell.hour { color: var(--ink-2); font-weight: 500; }
+  .time-cell.band-start { border-top: 2px solid var(--line-2); }
+  .time-cell.band-gap { background: repeating-linear-gradient(135deg, transparent 0 6px, var(--surface-2) 6px 7px); color: var(--ink-4); font-size: 10px; height: 28px; }
+
+  .day-col { border-right: 1px solid var(--line); min-width: 0; }
+  .day-col:last-child { border-right: none; }
+
+  .slot {
+    height: 48px;
+    border-bottom: 1px solid var(--line);
+    padding: 4px 6px;
+    position: relative;
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .slot.band-start { border-top: 2px solid var(--line-2); }
+  .slot.band-gap {
+    height: 28px;
+    background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(179,170,153,0.12) 6px 7px);
+    cursor: default;
+    border-bottom: 1px solid var(--line);
+  }
+  .slot.empty .slot-inner {
+    border: 1px dashed var(--line-2);
+    border-radius: 6px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-4);
+    font-size: 11px;
+    transition: border-color .12s, color .12s, background .12s;
+  }
+  .slot.empty:hover .slot-inner { border-color: var(--ink-3); color: var(--ink-3); background: var(--surface); }
+  .slot.drag-over .slot-inner { border-color: var(--accent) !important; border-style: solid !important; background: rgba(47,111,95,0.06) !important; color: var(--accent) !important; }
+  .slot.drag-over.filled .chip { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .chip {
+    height: 100%;
+    border-radius: 6px;
+    padding: 5px 8px 4px;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-size: 11.5px;
+    line-height: 1.2;
+    position: relative;
+    cursor: grab;
+    background: var(--chip-color);
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,0.12);
+    user-select: none;
+  }
+  .chip:active { cursor: grabbing; }
+  .chip.dragging { opacity: .35; }
+  .chip-name {
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chip-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    opacity: 0.85;
+    letter-spacing: 0.02em;
+  }
+  .chip .note-flag {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: rgba(255,255,255,0.85);
+    display: inline-block;
+  }
+  .chip .note-flag.empty { display: none; }
+
+  /* ---------- RIGHT SIDEBAR: Notes / Summary ---------- */
+  .right {
+    background: var(--surface);
+    border-left: 1px solid var(--line);
+    padding: 22px 20px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .summary-grid {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .sum-row {
+    display: grid;
+    grid-template-columns: 12px 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--line);
+    font-size: 12.5px;
+  }
+  .sum-row:last-child { border-bottom: none; }
+  .sum-row .swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--cat-color); }
+  .sum-row .count { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); }
+  .sum-row .hrs { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink); font-weight: 500; min-width: 46px; text-align: right; }
+  .sum-row.zero .hrs, .sum-row.zero .count, .sum-row.zero span { color: var(--ink-4); }
+
+  .note-panel {
+    margin-top: 20px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    padding: 14px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 240px;
+  }
+  .note-panel .empty-state {
+    color: var(--ink-3);
+    font-size: 12.5px;
+    text-align: center;
+    margin-top: 28px;
+    line-height: 1.55;
+  }
+  .note-panel .empty-state .serif { font-size: 16px; color: var(--ink-2); display: block; margin-bottom: 6px; }
+
+  .note-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .note-head .swatch { width: 10px; height: 10px; border-radius: 3px; }
+  .note-head .title { font-weight: 600; font-size: 13.5px; }
+  .note-when { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); margin-bottom: 10px; }
+
+  .note-textarea {
+    flex: 1;
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--ink);
+    resize: none;
+    background: #fefdfb;
+    outline: none;
+    line-height: 1.5;
+    min-height: 180px;
+  }
+  .note-textarea:focus { border-color: var(--ink-3); }
+  .note-actions { display: flex; gap: 6px; margin-top: 10px; justify-content: space-between; }
+
+  .templates-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+  }
+  .tmpl-chip {
+    font-size: 11px;
+    padding: 5px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-2);
+    cursor: pointer;
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .tmpl-chip:hover { background: var(--surface-2); color: var(--ink); }
+  .tmpl-chip .x { color: var(--ink-4); font-size: 13px; line-height: 1; }
+  .tmpl-chip .x:hover { color: var(--danger); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: var(--ink);
+    color: var(--surface);
+    padding: 9px 14px;
+    font-size: 12.5px;
+    border-radius: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    z-index: 99;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 99px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- LEFT: CATEGORIES -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-title">Weekly Slot Planner</span>
+    </div>
+    <div class="brand-sub">Expressway · 16h / week</div>
+
+    <div class="section-label">
+      <span>Categories</span>
+      <span class="hint">drag to grid</span>
+    </div>
+    <div class="cat-list" id="catList"></div>
+
+    <div class="section-label" style="margin-top: 26px;">Templates</div>
+    <div class="templates-bar" id="templatesBar"></div>
+    <button class="btn" id="saveTemplateBtn" style="margin-top: 10px; width: 100%;">＋ Save current week as template</button>
+
+    <div class="footer-note">
+      <div style="margin-bottom: 6px;"><kbd>drag</kbd> a category chip onto any slot</div>
+      <div style="margin-bottom: 6px;"><kbd>drag</kbd> a filled slot to move or swap it</div>
+      <div><kbd>click</kbd> a slot to edit its note · <kbd>×</kbd> on the chip to clear</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="top-bar">
+      <div>
+        <h1 class="week-title">Week of <span id="weekLabel">—</span></h1>
+        <div class="week-meta">
+          <span>Mon 20 Apr – Fri 24 Apr, 2026</span>
+          <span class="dot"></span>
+          <span>Expressway · Part-time</span>
+          <span class="dot"></span>
+          <span>50 slots available · <span id="quotaText">32 to fill</span></span>
+        </div>
+        <div class="actions">
+          <button class="btn" id="copyMonBtn">Copy Monday → all days</button>
+          <button class="btn" id="prevWeekBtn">＋ Duplicate last week</button>
+          <button class="btn danger" id="clearBtn">Clear week</button>
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <div class="progress-pill">
+          <div class="nums"><strong id="filledCount">0</strong><span class="dim"> / 32 quota</span></div>
+          <div class="bar"><div class="fill" id="fillBar"></div><div class="quota" title="32 slot quota"></div></div>
+          <div class="nums"><span id="hoursTotal">0.0</span><span class="dim">h</span></div>
+        </div>
+        <div style="font-size:11px; color: var(--ink-3); margin-top: 6px; font-family:'JetBrains Mono',monospace;">
+          <span id="overQuotaText">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <!-- RIGHT: SUMMARY + NOTE -->
+  <aside class="right">
+    <div class="section-label" style="margin-top:0;">This week</div>
+    <div class="summary-grid" id="summaryGrid"></div>
+
+    <div class="note-panel" id="notePanel">
+      <div class="empty-state" id="noteEmpty">
+        <span class="serif">Pick a slot.</span>
+        Click any filled slot to log a note about what you worked on — it stays with that slot for history.
+      </div>
+      <div id="noteEditor" style="display:none; flex:1; flex-direction:column;">
+        <div class="note-head">
+          <span class="swatch" id="noteSwatch"></span>
+          <span class="title" id="noteTitle">—</span>
+        </div>
+        <div class="note-when mono" id="noteWhen">—</div>
+        <textarea class="note-textarea" id="noteText" placeholder="What did you do in this slot? Log decisions, blockers, outputs, links…"></textarea>
+        <div class="note-actions">
+          <button class="btn danger" id="clearSlotBtn">Clear slot</button>
+          <span class="mono" style="font-size:10.5px;color:var(--ink-3);align-self:center;" id="autosaveHint">saved</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ------------ DATA ------------ */
+const CATEGORIES = [
+  { id: 'admin',    name: 'General Admin',           color: 'var(--c-admin)',    hex: '#8a7a5c' },
+  { id: 'ppm',      name: 'Paid Project Management', color: 'var(--c-ppm)',      hex: '#2f6f5f' },
+  { id: 'tool',     name: 'Tool Creation',           color: 'var(--c-tool)',     hex: '#3a6a9b' },
+  { id: 'process',  name: 'Process Work',            color: 'var(--c-process)',  hex: '#6a5a8a' },
+  { id: 'proposal', name: 'Proposal / Quote',        color: 'var(--c-proposal)', hex: '#b07a2c' },
+  { id: 'outreach', name: 'Email Outreach',          color: 'var(--c-outreach)', hex: '#9a5a6f' },
+  { id: 'meeting',  name: 'Meetings',                color: 'var(--c-meeting)',  hex: '#b24a3a' },
+  { id: 'content',  name: 'Content Creation',        color: 'var(--c-content)',  hex: '#5a8a4a' },
+  { id: 'client',   name: 'Client Work',             color: 'var(--c-client)',   hex: '#3a3a3a' },
+];
+const CAT_BY_ID = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
+
+const DAYS = [
+  { key: 'mon', name: 'Monday',    date: 'Apr 20' },
+  { key: 'tue', name: 'Tuesday',   date: 'Apr 21' },
+  { key: 'wed', name: 'Wednesday', date: 'Apr 22' },
+  { key: 'thu', name: 'Thursday',  date: 'Apr 23' },
+  { key: 'fri', name: 'Friday',    date: 'Apr 24' },
+];
+
+// Slot structure: 10 slots per day
+// Band A: 07:00–09:00 (4 slots)   —  indices 0..3
+// Gap:    09:00–10:00
+// Band B: 10:00–12:00 (4 slots)   —  indices 4..7
+// Gap:    12:00–16:00
+// Band C: 16:00–17:00 (2 slots)   —  indices 8..9
+const SLOT_TIMES = [
+  { start: '07:00', band: 'A' }, { start: '07:30', band: 'A' },
+  { start: '08:00', band: 'A' }, { start: '08:30', band: 'A' },
+  { start: '10:00', band: 'B' }, { start: '10:30', band: 'B' },
+  { start: '11:00', band: 'B' }, { start: '11:30', band: 'B' },
+  { start: '16:00', band: 'C' }, { start: '16:30', band: 'C' },
+];
+const SLOTS_PER_DAY = 10;
+const QUOTA = 32;
+
+/* ------------ STATE ------------ */
+const LS_KEY = 'expressway.weekly.v1';
+const LS_TMPL = 'expressway.weekly.templates.v1';
+
+const defaultState = () => {
+  const week = {};
+  DAYS.forEach(d => {
+    week[d.key] = Array(SLOTS_PER_DAY).fill(null).map(() => ({ cat: null, note: '' }));
+  });
+  return { week, selected: null };
+};
+
+let state;
+try {
+  const raw = localStorage.getItem(LS_KEY);
+  state = raw ? JSON.parse(raw) : defaultState();
+  // shape guard
+  DAYS.forEach(d => { if (!state.week[d.key]) state.week[d.key] = defaultState().week[d.key]; });
+} catch (e) { state = defaultState(); }
+
+let templates = [];
+try { templates = JSON.parse(localStorage.getItem(LS_TMPL) || '[]'); } catch(e){ templates = []; }
+
+const save = () => localStorage.setItem(LS_KEY, JSON.stringify(state));
+const saveTemplates = () => localStorage.setItem(LS_TMPL, JSON.stringify(templates));
+
+/* ------------ RENDER: CATEGORY PALETTE ------------ */
+const catList = document.getElementById('catList');
+function renderCats() {
+  catList.innerHTML = '';
+  CATEGORIES.forEach(c => {
+    const counts = countCat(c.id);
+    const el = document.createElement('div');
+    el.className = 'cat';
+    el.draggable = true;
+    el.dataset.cat = c.id;
+    el.style.setProperty('--cat-color', c.color);
+    el.innerHTML = `
+      <span class="cat-dot"></span>
+      <span class="cat-name">${c.name}</span>
+      <span class="cat-count mono">${counts}</span>
+    `;
+    el.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/source', JSON.stringify({ kind: 'palette', catId: c.id }));
+      e.dataTransfer.effectAllowed = 'copy';
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', () => el.classList.remove('dragging'));
+    catList.appendChild(el);
+  });
+
+  // Erase tile
+  const erase = document.createElement('div');
+  erase.className = 'cat erase';
+  erase.draggable = true;
+  erase.dataset.cat = '__erase__';
+  erase.innerHTML = `
+    <span class="cat-dot"></span>
+    <span class="cat-name">Clear (drag onto slot)</span>
+    <span class="cat-count mono">✕</span>
+  `;
+  erase.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/source', JSON.stringify({ kind: 'erase' }));
+    e.dataTransfer.effectAllowed = 'copy';
+    erase.classList.add('dragging');
+  });
+  erase.addEventListener('dragend', () => erase.classList.remove('dragging'));
+  catList.appendChild(erase);
+}
+
+function countCat(id) {
+  let n = 0;
+  DAYS.forEach(d => state.week[d.key].forEach(s => { if (s.cat === id) n++; }));
+  return n;
+}
+
+/* ------------ RENDER: GRID ------------ */
+const grid = document.getElementById('grid');
+
+function timeBand(i) {
+  if (i < 4) return 'A';
+  if (i < 8) return 'B';
+  return 'C';
+}
+
+function renderGrid() {
+  grid.innerHTML = '';
+
+  // Header row
+  const corner = document.createElement('div');
+  corner.className = 'head corner-hint';
+  corner.innerHTML = 'Time';
+  grid.appendChild(corner);
+
+  DAYS.forEach(d => {
+    const filled = state.week[d.key].filter(s => s.cat).length;
+    const h = document.createElement('div');
+    h.className = 'head day-head';
+    h.innerHTML = `
+      <div class="day-name">${d.name}</div>
+      <div class="day-date">${d.date}</div>
+      <span class="day-total mono">${filled}/10 · ${(filled*0.5).toFixed(1)}h</span>
+    `;
+    grid.appendChild(h);
+  });
+
+  // Build rows: we render by iterating slot index (0..9) with gaps after idx 3 and idx 7
+  const timeCol = document.createElement('div');
+  timeCol.className = 'time-col';
+  grid.appendChild(timeCol);
+
+  const dayCols = DAYS.map(d => {
+    const col = document.createElement('div');
+    col.className = 'day-col';
+    col.dataset.day = d.key;
+    grid.appendChild(col);
+    return col;
+  });
+
+  const rowOrder = [
+    { type: 'slot', idx: 0 }, { type: 'slot', idx: 1 }, { type: 'slot', idx: 2 }, { type: 'slot', idx: 3 },
+    { type: 'gap', label: '09:00 · break' },
+    { type: 'slot', idx: 4 }, { type: 'slot', idx: 5 }, { type: 'slot', idx: 6 }, { type: 'slot', idx: 7 },
+    { type: 'gap', label: '12:00 · off' },
+    { type: 'slot', idx: 8 }, { type: 'slot', idx: 9 },
+  ];
+
+  rowOrder.forEach(row => {
+    if (row.type === 'gap') {
+      const t = document.createElement('div');
+      t.className = 'time-cell band-gap mono';
+      t.textContent = row.label;
+      timeCol.appendChild(t);
+      dayCols.forEach(col => {
+        const g = document.createElement('div');
+        g.className = 'slot band-gap';
+        col.appendChild(g);
+      });
+      return;
+    }
+
+    const idx = row.idx;
+    const t = SLOT_TIMES[idx];
+    const isHour = t.start.endsWith(':00');
+    const isBandStart = (idx === 0 || idx === 4 || idx === 8);
+
+    const tc = document.createElement('div');
+    tc.className = 'time-cell' + (isHour ? ' hour' : '') + (isBandStart ? ' band-start' : '');
+    tc.textContent = t.start;
+    timeCol.appendChild(tc);
+
+    DAYS.forEach((d, di) => {
+      const col = dayCols[di];
+      const slot = state.week[d.key][idx];
+      const cell = document.createElement('div');
+      cell.className = 'slot' + (isBandStart ? ' band-start' : '');
+      cell.dataset.day = d.key;
+      cell.dataset.idx = idx;
+
+      if (slot.cat) {
+        cell.classList.add('filled');
+        const c = CAT_BY_ID[slot.cat];
+        cell.innerHTML = `
+          <div class="chip" draggable="true" style="--chip-color:${c.color};">
+            <div class="chip-name">${c.name}</div>
+            <div class="chip-meta">
+              <span>${t.start}</span>
+              <span class="note-flag ${slot.note ? '' : 'empty'}"></span>
+            </div>
+          </div>
+        `;
+        const chip = cell.querySelector('.chip');
+        chip.addEventListener('dragstart', (e) => {
+          e.stopPropagation();
+          e.dataTransfer.setData('text/source', JSON.stringify({ kind: 'slot', day: d.key, idx }));
+          e.dataTransfer.effectAllowed = 'move';
+          chip.classList.add('dragging');
+        });
+        chip.addEventListener('dragend', () => chip.classList.remove('dragging'));
+      } else {
+        cell.classList.add('empty');
+        cell.innerHTML = `<div class="slot-inner">＋</div>`;
+      }
+
+      // Selected state
+      if (state.selected && state.selected.day === d.key && state.selected.idx === idx) {
+        cell.style.boxShadow = 'inset 0 0 0 2px var(--ink)';
+      }
+
+      // Drop targets
+      cell.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        cell.classList.add('drag-over');
+      });
+      cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+      cell.addEventListener('drop', (e) => {
+        e.preventDefault();
+        cell.classList.remove('drag-over');
+        const raw = e.dataTransfer.getData('text/source');
+        if (!raw) return;
+        const src = JSON.parse(raw);
+        handleDrop(src, d.key, idx);
+      });
+
+      // Click to select/edit
+      cell.addEventListener('click', (e) => {
+        if (e.target.closest('.chip') || slot.cat) {
+          selectSlot(d.key, idx);
+        } else {
+          // empty slot quick-cycle: open note panel (no category yet — hint)
+          selectSlot(d.key, idx);
+        }
+      });
+
+      col.appendChild(cell);
+    });
+  });
+}
+
+/* ------------ DROP LOGIC ------------ */
+function handleDrop(src, destDay, destIdx) {
+  const dest = state.week[destDay][destIdx];
+
+  if (src.kind === 'palette') {
+    // Assign category; keep existing note.
+    dest.cat = src.catId;
+    afterChange();
+    flashSave();
+    return;
+  }
+
+  if (src.kind === 'erase') {
+    dest.cat = null;
+    dest.note = '';
+    afterChange();
+    return;
+  }
+
+  if (src.kind === 'slot') {
+    if (src.day === destDay && src.idx === destIdx) return;
+    const source = state.week[src.day][src.idx];
+    // Swap (move if dest empty)
+    const a = { ...source };
+    const b = { ...dest };
+    state.week[destDay][destIdx] = a;
+    state.week[src.day][src.idx] = b;
+    afterChange();
+    return;
+  }
+}
+
+/* ------------ SELECT / NOTE ------------ */
+const noteEmpty = document.getElementById('noteEmpty');
+const noteEditor = document.getElementById('noteEditor');
+const noteSwatch = document.getElementById('noteSwatch');
+const noteTitle = document.getElementById('noteTitle');
+const noteWhen = document.getElementById('noteWhen');
+const noteText = document.getElementById('noteText');
+const autosaveHint = document.getElementById('autosaveHint');
+
+function selectSlot(day, idx) {
+  state.selected = { day, idx };
+  save();
+  renderNote();
+  // re-render grid to update selection ring
+  renderGrid();
+}
+
+function renderNote() {
+  if (!state.selected) {
+    noteEmpty.style.display = 'block';
+    noteEditor.style.display = 'none';
+    return;
+  }
+  const { day, idx } = state.selected;
+  const slot = state.week[day][idx];
+  const d = DAYS.find(x => x.key === day);
+  const t = SLOT_TIMES[idx];
+  const endH = Number(t.start.split(':')[0]);
+  const endM = Number(t.start.split(':')[1]) + 30;
+  const end = `${String(endM >= 60 ? endH + 1 : endH).padStart(2,'0')}:${String(endM % 60).padStart(2,'0')}`;
+
+  if (!slot.cat) {
+    noteEmpty.style.display = 'block';
+    noteEmpty.innerHTML = `
+      <span class="serif">${d.name} ${t.start}–${end}</span>
+      Drag a category from the left to fill this slot, then log your notes here.
+    `;
+    noteEditor.style.display = 'none';
+    return;
+  }
+
+  const c = CAT_BY_ID[slot.cat];
+  noteEmpty.style.display = 'none';
+  noteEditor.style.display = 'flex';
+  noteSwatch.style.background = c.color;
+  noteTitle.textContent = c.name;
+  noteWhen.textContent = `${d.name}, ${d.date} · ${t.start}–${end}`;
+  noteText.value = slot.note || '';
+  autosaveHint.textContent = slot.note ? 'saved' : 'empty';
+}
+
+let noteSaveTimer;
+noteText.addEventListener('input', () => {
+  if (!state.selected) return;
+  const { day, idx } = state.selected;
+  state.week[day][idx].note = noteText.value;
+  autosaveHint.textContent = 'saving…';
+  clearTimeout(noteSaveTimer);
+  noteSaveTimer = setTimeout(() => {
+    save();
+    autosaveHint.textContent = 'saved';
+    // re-render grid to update note-flag dot
+    renderGrid();
+  }, 300);
+});
+
+document.getElementById('clearSlotBtn').addEventListener('click', () => {
+  if (!state.selected) return;
+  const { day, idx } = state.selected;
+  state.week[day][idx] = { cat: null, note: '' };
+  afterChange();
+});
+
+/* ------------ SUMMARY ------------ */
+const summaryGrid = document.getElementById('summaryGrid');
+function renderSummary() {
+  summaryGrid.innerHTML = '';
+  const totals = {};
+  CATEGORIES.forEach(c => totals[c.id] = 0);
+  DAYS.forEach(d => state.week[d.key].forEach(s => { if (s.cat) totals[s.cat]++; }));
+
+  const sorted = [...CATEGORIES].sort((a,b) => totals[b.id] - totals[a.id] || CATEGORIES.indexOf(a) - CATEGORIES.indexOf(b));
+
+  sorted.forEach(c => {
+    const n = totals[c.id];
+    const row = document.createElement('div');
+    row.className = 'sum-row' + (n === 0 ? ' zero' : '');
+    row.style.setProperty('--cat-color', c.color);
+    row.innerHTML = `
+      <span class="swatch"></span>
+      <span>${c.name}</span>
+      <span class="count">${n}</span>
+      <span class="hrs">${(n * 0.5).toFixed(1)}h</span>
+    `;
+    summaryGrid.appendChild(row);
+  });
+
+  // Progress pill
+  const filled = Object.values(totals).reduce((a,b) => a+b, 0);
+  const pct = Math.min(100, (filled / QUOTA) * 100);
+  document.getElementById('filledCount').textContent = filled;
+  document.getElementById('hoursTotal').textContent = (filled * 0.5).toFixed(1);
+  document.getElementById('fillBar').style.width = pct + '%';
+  const over = filled - QUOTA;
+  const overEl = document.getElementById('overQuotaText');
+  if (filled < QUOTA) overEl.textContent = `${QUOTA - filled} slots to quota`;
+  else if (filled === QUOTA) overEl.textContent = `quota met · log any extras`;
+  else overEl.textContent = `+${over} slot${over===1?'':'s'} over quota`;
+}
+
+/* ------------ TEMPLATES ------------ */
+const templatesBar = document.getElementById('templatesBar');
+function renderTemplates() {
+  templatesBar.innerHTML = '';
+  if (templates.length === 0) {
+    const hint = document.createElement('div');
+    hint.style.cssText = 'font-size:11px; color:var(--ink-4);';
+    hint.textContent = 'No templates yet';
+    templatesBar.appendChild(hint);
+    return;
+  }
+  templates.forEach((t, i) => {
+    const el = document.createElement('span');
+    el.className = 'tmpl-chip';
+    el.innerHTML = `<span>${t.name}</span><span class="x" title="Delete">×</span>`;
+    el.firstElementChild.addEventListener('click', () => {
+      state.week = JSON.parse(JSON.stringify(t.week));
+      state.selected = null;
+      afterChange();
+      toast(`Loaded "${t.name}"`);
+    });
+    el.lastElementChild.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (confirm(`Delete template "${t.name}"?`)) {
+        templates.splice(i, 1);
+        saveTemplates();
+        renderTemplates();
+      }
+    });
+    templatesBar.appendChild(el);
+  });
+}
+
+document.getElementById('saveTemplateBtn').addEventListener('click', () => {
+  const name = prompt('Template name?', `Week of Apr 20`);
+  if (!name) return;
+  templates.push({ name, week: JSON.parse(JSON.stringify(state.week)) });
+  saveTemplates();
+  renderTemplates();
+  toast(`Saved "${name}"`);
+});
+
+/* ------------ ACTIONS ------------ */
+document.getElementById('copyMonBtn').addEventListener('click', () => {
+  const mon = state.week.mon;
+  DAYS.slice(1).forEach(d => {
+    state.week[d.key] = mon.map(s => ({ cat: s.cat, note: '' })); // don't duplicate notes
+  });
+  afterChange();
+  toast('Copied Monday to Tue–Fri (notes not duplicated)');
+});
+
+document.getElementById('prevWeekBtn').addEventListener('click', () => {
+  if (templates.length === 0) {
+    toast('No previous templates — save one first');
+    return;
+  }
+  const last = templates[templates.length - 1];
+  state.week = JSON.parse(JSON.stringify(last.week));
+  afterChange();
+  toast(`Loaded "${last.name}"`);
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  if (!confirm('Clear the entire week? This cannot be undone.')) return;
+  state = defaultState();
+  afterChange();
+});
+
+/* ------------ HELPERS ------------ */
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+let saveFlashTimer;
+function flashSave() {
+  autosaveHint.textContent = 'saved';
+}
+
+function afterChange() {
+  save();
+  renderCats();
+  renderGrid();
+  renderSummary();
+  renderNote();
+}
+
+/* ------------ INIT ------------ */
+document.getElementById('weekLabel').textContent = 'Apr 20';
+renderCats();
+renderGrid();
+renderSummary();
+renderNote();
+renderTemplates();
+</script>
+</body>
+</html>
