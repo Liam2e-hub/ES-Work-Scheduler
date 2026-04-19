@@ -550,7 +550,7 @@
       <div>
         <h1 class="week-title">Week of <span id="weekLabel">—</span></h1>
         <div class="week-meta">
-          <span>Mon 20 Apr – Fri 24 Apr, 2026</span>
+          <span id="weekRange">—</span>
           <span class="dot"></span>
           <span>Expressway · Part-time</span>
           <span class="dot"></span>
@@ -558,7 +558,7 @@
         </div>
         <div class="actions">
           <button class="btn" id="copyMonBtn">Copy Monday → all days</button>
-          <button class="btn" id="prevWeekBtn">＋ Duplicate last week</button>
+          <button class="btn" id="prevWeekBtn">← Previous week</button>
           <button class="btn danger" id="clearBtn">Clear week</button>
         </div>
       </div>
@@ -606,6 +606,10 @@
 <div class="toast" id="toast"></div>
 
 <script>
+/* ------------ CONFIG ------------ */
+const API_BASE  = 'https://es-work-scheduler.me-7b3.workers.dev';
+const API_TOKEN = 'REPLACE_WITH_YOUR_BEARER_TOKEN';
+
 /* ------------ DATA ------------ */
 const CATEGORIES = [
   { id: 'admin',    name: 'General Admin',           color: 'var(--c-admin)',    hex: '#8a7a5c' },
@@ -620,20 +624,6 @@ const CATEGORIES = [
 ];
 const CAT_BY_ID = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 
-const DAYS = [
-  { key: 'mon', name: 'Monday',    date: 'Apr 20' },
-  { key: 'tue', name: 'Tuesday',   date: 'Apr 21' },
-  { key: 'wed', name: 'Wednesday', date: 'Apr 22' },
-  { key: 'thu', name: 'Thursday',  date: 'Apr 23' },
-  { key: 'fri', name: 'Friday',    date: 'Apr 24' },
-];
-
-// Slot structure: 10 slots per day
-// Band A: 07:00–09:00 (4 slots)   —  indices 0..3
-// Gap:    09:00–10:00
-// Band B: 10:00–12:00 (4 slots)   —  indices 4..7
-// Gap:    12:00–16:00
-// Band C: 16:00–17:00 (2 slots)   —  indices 8..9
 const SLOT_TIMES = [
   { start: '07:00', band: 'A' }, { start: '07:30', band: 'A' },
   { start: '08:00', band: 'A' }, { start: '08:30', band: 'A' },
@@ -644,10 +634,63 @@ const SLOT_TIMES = [
 const SLOTS_PER_DAY = 10;
 const QUOTA = 32;
 
-/* ------------ STATE ------------ */
-const LS_KEY = 'expressway.weekly.v1';
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* ------------ WEEK HELPERS ------------ */
+function getMondayOfWeek(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() - day + 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function getISOWeekKey(monday) {
+  const d = new Date(Date.UTC(monday.getFullYear(), monday.getMonth(), monday.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+function buildDays(monday) {
+  const names = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const keys  = ['mon','tue','wed','thu','fri'];
+  return keys.map((key, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return { key, name: names[i], date: `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}` };
+  });
+}
+
+let currentMonday  = getMondayOfWeek();
+let currentWeekKey = getISOWeekKey(currentMonday);
+let DAYS           = buildDays(currentMonday);
+
+/* ------------ API ------------ */
+const LS_KEY  = 'expressway.weekly.v1';
 const LS_TMPL = 'expressway.weekly.templates.v1';
 
+async function apiFetch(path, options = {}) {
+  try {
+    const res = await fetch(API_BASE + path, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_TOKEN}`,
+        ...(options.headers || {}),
+      },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    console.error('API error:', path, e.message);
+    return null;
+  }
+}
+
+/* ------------ STATE ------------ */
 const defaultState = () => {
   const week = {};
   DAYS.forEach(d => {
@@ -656,19 +699,49 @@ const defaultState = () => {
   return { week, selected: null };
 };
 
-let state;
-try {
-  const raw = localStorage.getItem(LS_KEY);
-  state = raw ? JSON.parse(raw) : defaultState();
-  // shape guard
-  DAYS.forEach(d => { if (!state.week[d.key]) state.week[d.key] = defaultState().week[d.key]; });
-} catch (e) { state = defaultState(); }
-
+let state     = defaultState();
 let templates = [];
-try { templates = JSON.parse(localStorage.getItem(LS_TMPL) || '[]'); } catch(e){ templates = []; }
 
-const save = () => localStorage.setItem(LS_KEY, JSON.stringify(state));
-const saveTemplates = () => localStorage.setItem(LS_TMPL, JSON.stringify(templates));
+/* ------------ SAVE (localStorage + debounced API PUT) ------------ */
+let apiSaveTimer;
+const save = () => {
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+  clearTimeout(apiSaveTimer);
+  apiSaveTimer = setTimeout(async () => {
+    const result = await apiFetch(`/api/week/${currentWeekKey}`, {
+      method: 'PUT',
+      body: JSON.stringify({ week: state.week }),
+    });
+    if (!result) toast('⚠ Save failed — stored locally');
+  }, 500);
+};
+
+/* ------------ LOAD ------------ */
+async function loadWeek() {
+  const data = await apiFetch(`/api/week/${currentWeekKey}`);
+  if (data) {
+    state.week = data.week;
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+  } else {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) Object.assign(state, JSON.parse(raw));
+    } catch (e) {}
+    toast('⚠ Offline — showing local data');
+  }
+  DAYS.forEach(d => {
+    if (!state.week[d.key]) state.week[d.key] = defaultState().week[d.key];
+  });
+}
+
+async function loadTemplates() {
+  const data = await apiFetch('/api/templates');
+  if (data) {
+    templates = data;
+  } else {
+    try { templates = JSON.parse(localStorage.getItem(LS_TMPL) || '[]'); } catch (e) { templates = []; }
+  }
+}
 
 /* ------------ RENDER: CATEGORY PALETTE ------------ */
 const catList = document.getElementById('catList');
@@ -1016,7 +1089,7 @@ function renderTemplates() {
     templatesBar.appendChild(hint);
     return;
   }
-  templates.forEach((t, i) => {
+  templates.forEach(t => {
     const el = document.createElement('span');
     el.className = 'tmpl-chip';
     el.innerHTML = `<span>${t.name}</span><span class="x" title="Delete">×</span>`;
@@ -1026,25 +1099,35 @@ function renderTemplates() {
       afterChange();
       toast(`Loaded "${t.name}"`);
     });
-    el.lastElementChild.addEventListener('click', (e) => {
+    el.lastElementChild.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (confirm(`Delete template "${t.name}"?`)) {
-        templates.splice(i, 1);
-        saveTemplates();
+      if (!confirm(`Delete template "${t.name}"?`)) return;
+      const result = await apiFetch(`/api/templates/${t.id}`, { method: 'DELETE' });
+      if (result) {
+        templates = templates.filter(x => x.id !== t.id);
         renderTemplates();
+      } else {
+        toast('⚠ Failed to delete template');
       }
     });
     templatesBar.appendChild(el);
   });
 }
 
-document.getElementById('saveTemplateBtn').addEventListener('click', () => {
-  const name = prompt('Template name?', `Week of Apr 20`);
+document.getElementById('saveTemplateBtn').addEventListener('click', async () => {
+  const name = prompt('Template name?', `Week of ${DAYS[0].date}`);
   if (!name) return;
-  templates.push({ name, week: JSON.parse(JSON.stringify(state.week)) });
-  saveTemplates();
-  renderTemplates();
-  toast(`Saved "${name}"`);
+  const result = await apiFetch('/api/templates', {
+    method: 'POST',
+    body: JSON.stringify({ name, week: JSON.parse(JSON.stringify(state.week)) }),
+  });
+  if (result) {
+    templates.unshift({ id: result.id, name: result.name, week: JSON.parse(JSON.stringify(state.week)) });
+    renderTemplates();
+    toast(`Saved "${name}"`);
+  } else {
+    toast('⚠ Failed to save template');
+  }
 });
 
 /* ------------ ACTIONS ------------ */
@@ -1057,15 +1140,19 @@ document.getElementById('copyMonBtn').addEventListener('click', () => {
   toast('Copied Monday to Tue–Fri (notes not duplicated)');
 });
 
-document.getElementById('prevWeekBtn').addEventListener('click', () => {
-  if (templates.length === 0) {
-    toast('No previous templates — save one first');
-    return;
+document.getElementById('prevWeekBtn').addEventListener('click', async () => {
+  const prevMonday = new Date(currentMonday);
+  prevMonday.setDate(currentMonday.getDate() - 7);
+  const prevKey = getISOWeekKey(prevMonday);
+  const data = await apiFetch(`/api/week/${prevKey}`);
+  if (data) {
+    state.week = data.week;
+    state.selected = null;
+    afterChange();
+    toast(`Loaded ${prevKey}`);
+  } else {
+    toast('⚠ Could not load previous week');
   }
-  const last = templates[templates.length - 1];
-  state.week = JSON.parse(JSON.stringify(last.week));
-  afterChange();
-  toast(`Loaded "${last.name}"`);
 });
 
 document.getElementById('clearBtn').addEventListener('click', () => {
@@ -1097,12 +1184,24 @@ function afterChange() {
 }
 
 /* ------------ INIT ------------ */
-document.getElementById('weekLabel').textContent = 'Apr 20';
-renderCats();
-renderGrid();
-renderSummary();
-renderNote();
-renderTemplates();
+async function init() {
+  const fri = new Date(currentMonday);
+  fri.setDate(currentMonday.getDate() + 4);
+  document.getElementById('weekLabel').textContent = DAYS[0].date;
+  document.getElementById('weekRange').textContent =
+    `Mon ${DAYS[0].date} – Fri ${DAYS[4].date}, ${currentMonday.getFullYear()}`;
+
+  await loadWeek();
+  await loadTemplates();
+
+  renderCats();
+  renderGrid();
+  renderSummary();
+  renderNote();
+  renderTemplates();
+}
+
+init();
 </script>
 </body>
 </html>
